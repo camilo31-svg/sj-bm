@@ -1,28 +1,29 @@
-# SR BM
+# SJ BM
 
-PWA de lectura y consulta de los 251 bhajans de *Bhajans SR 1-227 Hindi* y su apéndice 228-251.
-
-Aplicación publicada: <https://camilo31-svg.github.io/sr-bm/>
+PWA de lectura y consulta de 340 bhajanes reunidos a partir de *Bhajans_hindi SJ* y *Bayanes de los Maestros*.
 
 ## Contenido
 
-- Texto canónico en devanagari, con los versos, puntos suspensivos y marcas `(2)` conservados; los saltos impuestos únicamente por el margen del PDF se muestran unidos.
-- Ficha táctil para cada aparición de palabra con su transliteración y glosa contextual en español.
-- Traducción oficial española completa en una pestaña independiente.
-- Índice, búsqueda, navegación anterior/siguiente y favoritos locales.
-- Funcionamiento sin conexión después de la primera carga.
-
-El texto y el orden proceden de los dos volúmenes devanagari. Las traducciones oficiales proceden de los volúmenes españoles 1-207, 208-249 y 250-251. Las glosas 1-227 proceden de la edición interlineal; las formas nuevas de 228-251 fueron cotejadas con el vocabulario existente y su contexto oficial.
+- 338 bhajanes del volumen devanagari y dos reconstruidos desde la transliteración oficial.
+- Texto devanagari con puntos suspensivos y marcas de repetición conservados.
+- Transliteración y ficha táctil en español para cada palabra.
+- Traducción oficial española para 222 composiciones.
+- Traducción literal asistida por vocabulario para las 118 composiciones sin edición española.
+- Los 219 bhajans con referencia impresa se ordenan por el número de la edición española (`17–356`, con los huecos y tres referencias repetidas del libro).
+- Las tres composiciones españolas sin número impreso reciben `357–359`; los textos exclusivos del volumen devanagari ocupan `360–477` en su orden original.
+- Lista verificable en [`bhajans-sin-edicion-espanola.md`](bhajans-sin-edicion-espanola.md).
+- Lista de las tres composiciones sin número en [`bhajans-espanoles-sin-numero-impreso.md`](bhajans-espanoles-sin-numero-impreso.md).
+- Índice, búsqueda, navegación, favoritos locales, modo oscuro y funcionamiento sin conexión.
 
 ## Ejecución local
 
 Desde la carpeta del proyecto:
 
 ```powershell
-python -m http.server 4173 --directory sr-bm
+python -m http.server 4175 --directory sj-bm
 ```
 
-Después, abre `http://localhost:4173`.
+Después, abre `http://localhost:4175`.
 
 ## Instalación en iPhone
 

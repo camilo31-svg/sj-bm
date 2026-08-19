@@ -1,16 +1,16 @@
 (() => {
   "use strict";
 
-  const data = window.SRBM_DATA;
+  const data = window.SJBM_DATA;
   const icons = window.SRBM_ICONS || {};
   if (!data?.bhajans?.length) return;
 
   const STORAGE = {
-    favorites: "sr-bm:favorites",
-    lastBhajan: "sr-bm:last-bhajan",
-    preferences: "sr-bm:preferences",
+    favorites: "sj-bm:v3:favorites",
+    lastBhajan: "sj-bm:v3:last-bhajan",
+    preferences: "sj-bm:preferences",
   };
-  const WORD_PATTERN = /[\u0900-\u097f]+(?::[\u0900-\u097f]+)?(?:[-'][\u0900-\u097f]+)*/gu;
+  const WORD_PATTERN = /[\u0900-\u0963\u0970-\u097f]+(?:[-'][\u0900-\u0963\u0970-\u097f]+)*/gu;
 
   const elements = {
     panel: document.getElementById("library-panel"),
@@ -37,9 +37,19 @@
   };
 
   const preferences = readJson(STORAGE.preferences, { showTransliteration: true, textScale: 1 });
-  const storedFavorites = readJson(STORAGE.favorites, []);
-  const hashNumber = Number(location.hash.match(/^#bhajan-(\d+)$/)?.[1]);
-  const storedNumber = Number(localStorage.getItem(STORAGE.lastBhajan));
+  const previousFavorites = readJson("sj-bm:v2:favorites", null);
+  const storedFavorites = readJson(
+    STORAGE.favorites,
+    previousFavorites === null
+      ? migrateLegacyNumbers(readJson("sj-bm:favorites", []))
+      : migratePreviousNumbers(previousFavorites),
+  );
+  const hashNumber = numberForRoute(location.hash.match(/^#bhajan-(.+)$/)?.[1]);
+  const storedNumber = Number(
+    localStorage.getItem(STORAGE.lastBhajan)
+    || migratePreviousNumber(Number(localStorage.getItem("sj-bm:v2:last-bhajan")))
+    || migrateLegacyNumber(Number(localStorage.getItem("sj-bm:last-bhajan"))),
+  );
   const initialNumber = validNumber(hashNumber) ? hashNumber : validNumber(storedNumber) ? storedNumber : 1;
   const state = {
     currentNumber: initialNumber,
@@ -62,6 +72,35 @@
     } catch {
       return fallback;
     }
+  }
+
+  function migrateLegacyNumber(number) {
+    if (!Number.isInteger(number)) return 0;
+    return data.bhajans.find((bhajan) => bhajan.legacy_number === number)?.number || 0;
+  }
+
+  function migrateLegacyNumbers(numbers) {
+    if (!Array.isArray(numbers)) return [];
+    return numbers.map(Number).map(migrateLegacyNumber).filter(Boolean);
+  }
+
+  function migratePreviousNumber(number) {
+    if (!Number.isInteger(number)) return 0;
+    return data.bhajans.find((bhajan) => bhajan.previous_number === number)?.number || 0;
+  }
+
+  function migratePreviousNumbers(numbers) {
+    if (!Array.isArray(numbers)) return [];
+    return numbers.map(Number).map(migratePreviousNumber).filter(Boolean);
+  }
+
+  function numberForRoute(route) {
+    if (!route) return 0;
+    return data.bhajans.find((bhajan) => bhajan.route === route)?.number || 0;
+  }
+
+  function routeForNumber(number) {
+    return data.bhajans[number - 1]?.route || String(number);
   }
 
   function savePreferences() {
@@ -118,7 +157,7 @@
     elements.theme.setAttribute("aria-label", dark ? "Activar modo claro" : "Activar modo oscuro");
     elements.theme.setAttribute("aria-pressed", String(dark));
     elements.theme.title = dark ? "Modo claro" : "Modo oscuro";
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#101513" : "#1f5b4f");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#101620" : "#235fa4");
   }
 
   function filteredBhajans() {
@@ -128,6 +167,8 @@
       if (!query) return true;
       const haystack = normalizeSearch([
         bhajan.number,
+        bhajan.display_number,
+        bhajan.route,
         bhajan.title,
         bhajan.title_transliteration,
         bhajan.title_es,
@@ -156,7 +197,7 @@
       return `
         <div class="bhajan-row${active ? " active" : ""}" role="listitem" data-number="${bhajan.number}">
           <button class="bhajan-open" type="button" data-open-bhajan="${bhajan.number}"${active ? ' aria-current="true"' : ""}>
-            <span class="bhajan-number">${String(bhajan.number).padStart(3, "0")}</span>
+            <span class="bhajan-number">${String(bhajan.display_number).padStart(3, "0")}</span>
             <span class="bhajan-list-copy">
               <strong lang="hi">${escapeHtml(bhajan.title)}</strong>
               <small>${escapeHtml(bhajan.author)}</small>
@@ -205,13 +246,18 @@
     const spanishParagraphs = (bhajan.spanish_blocks?.length ? bhajan.spanish_blocks : bhajan.spanish.split(/\n+/))
       .map((line) => line.trim()).filter(Boolean);
     const spanishNotes = (bhajan.spanish_notes || []).map((line) => line.trim()).filter(Boolean);
-    const languageLabel = "Punyabí · devanagari";
+    const languageLabel = bhajan.source_language === "hi"
+      ? "Hindi · devanagari"
+      : "Punyabí · devanagari";
 
     elements.reader.innerHTML = `
       <header class="bhajan-header">
         <div class="bhajan-kicker">
-          <span>Bhajan ${bhajan.number}</span>
-          <span>p. ${bhajan.book_page}</span>
+          <span>Bhajan ${bhajan.display_number}</span>
+          ${bhajan.official_duplicate_count > 1 ? `<span>Referencia repetida · ${bhajan.official_occurrence}/${bhajan.official_duplicate_count}</span>` : ""}
+          ${bhajan.number_origin === "official_unnumbered" ? "<span>Número asignado</span>" : ""}
+          ${bhajan.number_origin === "devanagari_only" ? "<span>Fuera de la edición española</span>" : ""}
+          ${bhajan.book_page ? `<span>p. ${bhajan.book_page}</span>` : "<span>Edición española</span>"}
           <span>${languageLabel}</span>
         </div>
         <h1 lang="hi">${escapeHtml(bhajan.title)}</h1>
@@ -255,7 +301,7 @@
       <section class="tab-panel spanish-panel"${state.tab !== "spanish" ? " hidden" : ""} aria-label="Traducción española">
         <div class="translation-status">
           ${iconMarkup("Info", 18)}
-          <span>Traducción oficial completa · Bhajan Mala</span>
+          <span>${escapeHtml(bhajan.translation_status || "Traducción española")}</span>
         </div>
         <div class="spanish-copy">
           ${spanishParagraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join("") || "<p>Traducción no disponible.</p>"}
@@ -268,7 +314,7 @@
     elements.favorite.title = favorite ? "Quitar de favoritos" : "Añadir a favoritos";
     elements.previous.disabled = bhajan.number === 1;
     elements.next.disabled = bhajan.number === data.bhajans.length;
-    elements.pagePosition.textContent = `${bhajan.number} / ${data.bhajans.length}`;
+    elements.pagePosition.textContent = `${bhajan.display_number} · ${bhajan.number}/${data.bhajans.length}`;
     localStorage.setItem(STORAGE.lastBhajan, String(bhajan.number));
   }
 
@@ -276,7 +322,7 @@
     if (!validNumber(number)) return;
     state.currentNumber = number;
     state.tab = "devanagari";
-    if (pushHistory) history.pushState({ bhajan: number }, "", `#bhajan-${number}`);
+    if (pushHistory) history.pushState({ bhajan: number }, "", `#bhajan-${routeForNumber(number)}`);
     renderList();
     renderReader();
     closeDrawer();
@@ -320,9 +366,12 @@
   }
 
   function openWord(word, lineIndex = null, wordIndex = null) {
-    const contextual = Number.isInteger(lineIndex) && Number.isInteger(wordIndex)
+    const contextualEntry = Number.isInteger(lineIndex) && Number.isInteger(wordIndex)
       ? currentBhajan().lines[lineIndex]?.words?.[wordIndex]
       : null;
+    const contextual = typeof contextualEntry === "string"
+      ? data.glosses[contextualEntry]
+      : contextualEntry;
     const gloss = contextual || data.glosses[word] || {
       devanagari: word,
       transliteration: word,
@@ -428,7 +477,7 @@
     if (!inside) elements.dialog.close();
   });
   window.addEventListener("popstate", () => {
-    const number = Number(location.hash.match(/^#bhajan-(\d+)$/)?.[1]);
+    const number = numberForRoute(location.hash.match(/^#bhajan-(.+)$/)?.[1]);
     if (validNumber(number)) selectBhajan(number, false);
   });
   window.addEventListener("resize", () => {
@@ -439,7 +488,7 @@
   applyTheme(state.theme);
   renderList();
   renderReader();
-  if (!location.hash) history.replaceState({ bhajan: state.currentNumber }, "", `#bhajan-${state.currentNumber}`);
+  if (!location.hash) history.replaceState({ bhajan: state.currentNumber }, "", `#bhajan-${routeForNumber(state.currentNumber)}`);
 
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
     window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

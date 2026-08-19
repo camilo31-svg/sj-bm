@@ -3,23 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1f5b4f">
-  <meta name="description" content="Bhajan Mala en devanagari con transliteración y traducción española.">
+  <meta name="theme-color" content="#235fa4">
+  <meta name="description" content="Bhajanes de los Maestros en devanagari con transliteración y traducción española.">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="SR BM">
-  <title>SR BM</title>
+  <meta name="apple-mobile-web-app-title" content="SJ BM">
+  <title>SJ BM</title>
   <script>
     try {
-      const preferences = JSON.parse(localStorage.getItem("sr-bm:preferences") || "{}");
+      const preferences = JSON.parse(localStorage.getItem("sj-bm:preferences") || "{}");
       document.documentElement.dataset.theme = preferences.theme === "dark" ? "dark" : "light";
     } catch {
       document.documentElement.dataset.theme = "light";
     }
   </script>
-  <link rel="icon" type="image/svg+xml" href="sr-bm-icon.svg">
-  <link rel="apple-touch-icon" href="sr-bm-icon-180.png">
+  <link rel="icon" type="image/svg+xml" href="sj-bm-icon.svg">
+  <link rel="apple-touch-icon" href="sj-bm-icon-180.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -32,8 +32,8 @@
         <div class="brand-lockup">
           <span class="brand-icon" aria-hidden="true"><i data-icon="BookOpen"></i></span>
           <span>
-            <strong>SR BM</strong>
-            <small>Bhajan Mala</small>
+            <strong>SJ BM</strong>
+            <small>Bhajanes de los Maestros</small>
           </span>
         </div>
         <button id="close-drawer" class="icon-button close-drawer" type="button" aria-label="Cerrar índice" title="Cerrar índice">
@@ -71,8 +71,8 @@
         <button id="open-drawer" class="icon-button mobile-only" type="button" aria-label="Abrir índice" title="Índice">
           <i data-icon="Menu"></i>
         </button>
-        <div class="mobile-brand" aria-label="SR BM">
-          <i data-icon="BookOpen"></i><strong>SR BM</strong>
+        <div class="mobile-brand" aria-label="SJ BM">
+          <i data-icon="BookOpen"></i><strong>SJ BM</strong>
         </div>
         <div class="toolbar-actions">
           <button id="mobile-search" class="icon-button mobile-only" type="button" aria-label="Buscar bhajan" title="Buscar">
@@ -88,7 +88,7 @@
       </header>
 
       <article id="reader" class="reader" aria-live="polite">
-        <div class="loading-state">Cargando Bhajan Mala…</div>
+        <div class="loading-state">Cargando los bhajanes…</div>
       </article>
 
       <nav class="reader-pagination" aria-label="Navegación entre bhajans">
@@ -96,7 +96,7 @@
           <i data-icon="ChevronLeft"></i><span>Anterior</span>
         </button>
         <button id="pagination-index" class="pagination-index" type="button" aria-label="Abrir índice">
-          <i data-icon="Library"></i><span id="page-position">1 / 251</span>
+          <i data-icon="Library"></i><span id="page-position">1 / 340</span>
         </button>
         <button id="next-bhajan" class="pagination-button next" type="button">
           <span>Siguiente</span><i data-icon="ChevronRight"></i>
@@ -120,9 +120,10 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-  <noscript>SR BM necesita JavaScript para mostrar el índice y las fichas de vocabulario.</noscript>
+  <noscript>SJ BM necesita JavaScript para mostrar el índice y las fichas de vocabulario.</noscript>
   <script src="icons.js"></script>
   <script src="data.js"></script>
+  <script src="bhajans.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

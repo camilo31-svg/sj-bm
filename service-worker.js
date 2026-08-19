@@ -1,4 +1,4 @@
-const CACHE_NAME = "sr-bm-static-2026-08-19-6";
+const CACHE_NAME = "sj-bm-static-2026-08-19-7";
 const OFFLINE_PAGE = "./index.html";
 const APP_SHELL = [
   "./",
@@ -6,12 +6,13 @@ const APP_SHELL = [
   "./styles.css",
   "./icons.js",
   "./data.js",
+  "./bhajans.js",
   "./app.js",
   "./manifest.webmanifest",
-  "./sr-bm-icon.svg",
-  "./sr-bm-icon-180.png",
-  "./sr-bm-icon-192.png",
-  "./sr-bm-icon-512.png"
+  "./sj-bm-icon.svg",
+  "./sj-bm-icon-180.png",
+  "./sj-bm-icon-192.png",
+  "./sj-bm-icon-512.png"
 ];
 
 self.addEventListener("install", (event) => {
