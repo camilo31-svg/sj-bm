@@ -1,42 +1,66 @@
 (() => {
   "use strict";
 
-  const isSj = Boolean(window.SJBM_DATA);
-  const data = isSj ? window.SJBM_DATA : window.SRBM_DATA;
-  const catalog = isSj ? window.SJBM_AUDIO : window.SRBM_AUDIO;
-  const icons = (isSj ? window.SJBM_ICONS : window.SRBM_ICONS) || {};
+  const data = window.SJBM_DATA;
+  const catalog = window.SJBM_AUDIO;
+  const icons = window.SRBM_ICONS || window.SJBM_ICONS || {};
   const playerIcons = {
     Play: [["path", { d: "m6 3 14 9-14 9z" }]],
     Pause: [
       ["rect", { x: "14", y: "4", width: "4", height: "16", rx: "1" }],
       ["rect", { x: "6", y: "4", width: "4", height: "16", rx: "1" }],
     ],
+    ChevronDown: [["path", { d: "m6 9 6 6 6-6" }]],
+    Check: [["path", { d: "M20 6 9 17l-5-5" }]],
+    X: [["path", { d: "M18 6 6 18" }], ["path", { d: "m6 6 12 12" }]],
   };
-  const appName = isSj ? "SJ BM" : "SR BM";
-  const iconPrefix = isSj ? "sj-bm" : "sr-bm";
+  const STORAGE_KEY = "sj-bm:audio-version-preferences";
   const button = document.getElementById("audio-button");
+  const optionsButton = document.getElementById("audio-options-button");
+  const dialog = document.getElementById("audio-version-dialog");
+  const dialogBhajan = document.getElementById("audio-version-bhajan");
+  const versionList = document.getElementById("audio-version-list");
+  const closeDialog = document.getElementById("close-audio-version-dialog");
   const audio = document.getElementById("bhajan-audio");
   const toast = document.getElementById("toast");
-  if (!data?.bhajans?.length || !catalog || !button || !audio) return;
+  if (!data?.bhajans?.length || !catalog || !button || !optionsButton || !dialog || !audio) return;
 
   let currentBhajan = bhajanFromLocation();
   let loadedKey = "";
+  let loadedVersionUrl = "";
   let loading = false;
   let toastTimer;
+  const preferences = readPreferences();
+
+  function readPreferences() {
+    try {
+      const value = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function savePreference(key, url) {
+    preferences[key] = url;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
+    } catch {
+      // Reproduction still works when private browsing blocks storage.
+    }
+  }
 
   function keyFor(bhajan) {
-    return isSj ? String(bhajan?.route || "") : String(bhajan?.number || "");
+    return String(bhajan?.route || "");
   }
 
   function displayNumber(bhajan) {
-    return isSj ? bhajan?.display_number : bhajan?.number;
+    return bhajan?.display_number;
   }
 
   function bhajanFromLocation() {
     const route = location.hash.match(/^#bhajan-(.+)$/)?.[1];
-    if (isSj) return data.bhajans.find((bhajan) => bhajan.route === route) || data.bhajans[0];
-    const number = Number(route);
-    return data.bhajans.find((bhajan) => bhajan.number === number) || data.bhajans[0];
+    return data.bhajans.find((bhajan) => bhajan.route === route) || data.bhajans[0];
   }
 
   function iconMarkup(name) {
@@ -47,8 +71,33 @@
     return `<svg class="lucide lucide-${name.toLowerCase()}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${children}</svg>`;
   }
 
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
   function currentEntry() {
     return catalog[keyFor(currentBhajan)] || null;
+  }
+
+  function versionsFor(entry) {
+    if (!entry) return [];
+    if (Array.isArray(entry.versions) && entry.versions.length) return entry.versions;
+    return entry.url ? [{ url: entry.url, label: "Grabación", filename: entry.source_title || "" }] : [];
+  }
+
+  function preferredVersion(entry) {
+    const savedUrl = preferences[keyFor(currentBhajan)];
+    return versionsFor(entry).find((version) => version.url === savedUrl) || null;
+  }
+
+  function loadedVersion(entry) {
+    if (loadedKey !== keyFor(currentBhajan)) return null;
+    return versionsFor(entry).find((version) => version.url === loadedVersionUrl) || null;
   }
 
   function showToast(message) {
@@ -56,11 +105,12 @@
     clearTimeout(toastTimer);
     toast.textContent = message;
     toast.hidden = false;
-    toastTimer = setTimeout(() => { toast.hidden = true; }, 2400);
+    toastTimer = setTimeout(() => { toast.hidden = true; }, 2600);
   }
 
-  function updateButton() {
+  function updateControls() {
     const entry = currentEntry();
+    const versions = versionsFor(entry);
     const currentKey = keyFor(currentBhajan);
     const playing = Boolean(entry && loadedKey === currentKey && !audio.paused && !audio.ended);
     const resumable = Boolean(entry && loadedKey === currentKey && audio.currentTime > 0 && !audio.ended);
@@ -69,6 +119,7 @@
     else if (loading) label = `Cargando audio del bhajan ${displayNumber(currentBhajan)}`;
     else if (playing) label = `Pausar bhajan ${displayNumber(currentBhajan)}`;
     else if (resumable) label = `Continuar bhajan ${displayNumber(currentBhajan)}`;
+    else if (versions.length > 1 && !preferredVersion(entry)) label = `Elegir grabación para el bhajan ${displayNumber(currentBhajan)}`;
 
     button.innerHTML = iconMarkup(playing ? "Pause" : "Play");
     button.disabled = !entry;
@@ -77,6 +128,11 @@
     button.setAttribute("aria-label", label);
     button.setAttribute("aria-pressed", String(playing));
     button.title = entry ? label : "Audio no disponible en MediaSeva";
+
+    optionsButton.innerHTML = iconMarkup("ChevronDown");
+    optionsButton.hidden = versions.length < 2;
+    optionsButton.disabled = versions.length < 2;
+    optionsButton.setAttribute("aria-label", `Elegir otra grabación del bhajan ${displayNumber(currentBhajan)}`);
   }
 
   function clearAudio() {
@@ -84,6 +140,7 @@
     audio.removeAttribute("src");
     audio.load();
     loadedKey = "";
+    loadedVersionUrl = "";
     loading = false;
     if ("mediaSession" in navigator) {
       navigator.mediaSession.metadata = null;
@@ -95,8 +152,9 @@
     if (!bhajan) return;
     const nextKey = keyFor(bhajan);
     if (loadedKey && loadedKey !== nextKey) clearAudio();
+    if (dialog.open) dialog.close();
     currentBhajan = bhajan;
-    updateButton();
+    updateControls();
   }
 
   function setMediaMetadata() {
@@ -104,46 +162,92 @@
     navigator.mediaSession.metadata = new MediaMetadata({
       title: `${displayNumber(currentBhajan)}. ${currentBhajan.title_transliteration || currentBhajan.title}`,
       artist: currentBhajan.author || "",
-      album: appName,
+      album: "SJ BM",
       artwork: [
-        { src: new URL(`${iconPrefix}-icon-192.png`, location.href).href, sizes: "192x192", type: "image/png" },
-        { src: new URL(`${iconPrefix}-icon-512.png`, location.href).href, sizes: "512x512", type: "image/png" },
+        { src: new URL("sj-bm-icon-192.png", location.href).href, sizes: "192x192", type: "image/png" },
+        { src: new URL("sj-bm-icon-512.png", location.href).href, sizes: "512x512", type: "image/png" },
       ],
     });
   }
 
-  function prepareCurrentAudio() {
-    const entry = currentEntry();
-    if (!entry) return false;
+  function prepareVersion(version) {
+    if (!version?.url) return false;
+    if (loadedKey && (loadedKey !== keyFor(currentBhajan) || loadedVersionUrl !== version.url)) clearAudio();
     loadedKey = keyFor(currentBhajan);
+    loadedVersionUrl = version.url;
     loading = true;
-    audio.src = entry.url;
+    audio.src = version.url;
     audio.load();
     setMediaMetadata();
-    updateButton();
+    updateControls();
     return true;
   }
 
   async function playCurrent() {
-    if (loadedKey !== keyFor(currentBhajan) && !prepareCurrentAudio()) return;
+    const entry = currentEntry();
+    if (!entry) return;
+    if (loadedKey !== keyFor(currentBhajan) || !loadedVersion(entry)) {
+      const version = preferredVersion(entry) || versionsFor(entry)[0];
+      if (!prepareVersion(version)) return;
+    }
     if (audio.ended) audio.currentTime = 0;
     loading = true;
-    updateButton();
+    updateControls();
     try {
       await audio.play();
     } catch {
       loading = false;
-      updateButton();
-      showToast("No se pudo reproducir el audio. Comprueba tu conexión.");
+      updateControls();
+      showToast("No se pudo reproducir esta grabación. Puedes elegir otra versión.");
     }
   }
 
+  async function chooseVersion(version) {
+    if (!version) return;
+    savePreference(keyFor(currentBhajan), version.url);
+    if (dialog.open) dialog.close();
+    if (loadedKey !== keyFor(currentBhajan) || loadedVersionUrl !== version.url) prepareVersion(version);
+    await playCurrent();
+  }
+
+  function cleanFilename(filename) {
+    return String(filename || "")
+      .replace(/\.mp3$/i, "")
+      .replace(/^\s*\d{3}(?:\s*-\s*\d+)?\s*-?\s*/, "")
+      .trim();
+  }
+
+  function openVersionDialog() {
+    const entry = currentEntry();
+    const versions = versionsFor(entry);
+    if (versions.length < 2) return;
+    const selectedUrl = loadedVersion(entry)?.url || preferredVersion(entry)?.url || "";
+    dialogBhajan.textContent = `${displayNumber(currentBhajan)}. ${currentBhajan.title_transliteration || currentBhajan.title}`;
+    versionList.innerHTML = versions.map((version, index) => {
+      const selected = version.url === selectedUrl;
+      return `
+        <button class="audio-version-option${selected ? " is-selected" : ""}" type="button" role="listitem" data-version-index="${index}" aria-label="${escapeHtml(version.label)}${selected ? ", seleccionada" : ""}">
+          <span class="audio-version-option-icon">${iconMarkup(selected ? "Check" : "Play")}</span>
+          <span class="audio-version-option-copy">
+            <strong>${escapeHtml(version.label)}</strong>
+            <small>${escapeHtml(cleanFilename(version.filename) || entry.source_title)}</small>
+          </span>
+        </button>`;
+    }).join("");
+    if (!dialog.open) dialog.showModal();
+  }
+
   function togglePlayback() {
-    if (!currentEntry()) return;
+    const entry = currentEntry();
+    if (!entry) return;
     if (loadedKey === keyFor(currentBhajan) && !audio.paused) {
       audio.pause();
-    } else {
+      return;
+    }
+    if (loadedVersion(entry) || preferredVersion(entry) || versionsFor(entry).length === 1) {
       void playCurrent();
+    } else {
+      openVersionDialog();
     }
   }
 
@@ -195,40 +299,52 @@
   }
 
   button.addEventListener("click", togglePlayback);
+  optionsButton.addEventListener("click", openVersionDialog);
+  closeDialog.addEventListener("click", () => dialog.close());
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
+  versionList.addEventListener("click", (event) => {
+    const option = event.target.closest("[data-version-index]");
+    if (!option) return;
+    const version = versionsFor(currentEntry())[Number(option.dataset.versionIndex)];
+    void chooseVersion(version);
+  });
   window.addEventListener("bhajanchange", (event) => setCurrentBhajan(event.detail?.bhajan));
   audio.addEventListener("play", () => {
     loading = false;
     if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
-    updateButton();
+    updateControls();
   });
   audio.addEventListener("playing", () => {
     loading = false;
-    updateButton();
+    updateControls();
   });
   audio.addEventListener("pause", () => {
     loading = false;
     if ("mediaSession" in navigator && loadedKey) navigator.mediaSession.playbackState = "paused";
-    updateButton();
+    updateControls();
   });
   audio.addEventListener("waiting", () => {
     loading = true;
-    updateButton();
+    updateControls();
   });
   audio.addEventListener("ended", () => {
     loading = false;
     if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "none";
-    updateButton();
+    updateControls();
   });
   audio.addEventListener("error", () => {
     if (!loadedKey) return;
     loading = false;
-    updateButton();
-    showToast("El audio no está disponible en este momento.");
+    updateControls();
+    showToast("Esta grabación no está disponible. Puedes elegir otra versión.");
   });
   audio.addEventListener("loadedmetadata", updatePositionState);
   audio.addEventListener("durationchange", updatePositionState);
   audio.addEventListener("timeupdate", updatePositionState);
 
+  closeDialog.innerHTML = iconMarkup("X");
   installMediaSessionActions();
   setCurrentBhajan(currentBhajan);
 })();

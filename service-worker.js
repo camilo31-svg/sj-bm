@@ -1,4 +1,4 @@
-const CACHE_NAME = "sj-bm-static-2026-09-06-audio-1";
+const CACHE_NAME = "sj-bm-static-2026-09-06-audio-versions-2";
 const OFFLINE_PAGE = "./index.html";
 const APP_SHELL = [
   "./",

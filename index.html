@@ -75,9 +75,14 @@
           <i data-icon="BookOpen"></i><strong>SJ BM</strong>
         </div>
         <div class="toolbar-actions">
-          <button id="audio-button" class="icon-button audio-button" type="button" aria-label="Reproducir bhajan" aria-pressed="false" title="Reproducir">
-            <i data-icon="Play"></i>
-          </button>
+          <div id="audio-control" class="audio-control" aria-label="Reproducción del bhajan">
+            <button id="audio-button" class="icon-button audio-button" type="button" aria-label="Reproducir bhajan" aria-pressed="false" title="Reproducir">
+              <i data-icon="Play"></i>
+            </button>
+            <button id="audio-options-button" class="icon-button audio-options-button" type="button" aria-label="Elegir grabación" title="Elegir grabación" hidden>
+              <i data-icon="ChevronDown"></i>
+            </button>
+          </div>
           <button id="mobile-search" class="icon-button mobile-only" type="button" aria-label="Buscar bhajan" title="Buscar">
             <i data-icon="Search"></i>
           </button>
@@ -107,6 +112,20 @@
       </nav>
     </main>
   </div>
+
+  <dialog id="audio-version-dialog" class="audio-version-dialog" aria-labelledby="audio-version-title">
+    <div class="audio-version-header">
+      <div>
+        <span class="dialog-eyebrow">Audio</span>
+        <h2 id="audio-version-title">Elegir grabación</h2>
+        <p id="audio-version-bhajan"></p>
+      </div>
+      <button id="close-audio-version-dialog" class="icon-button" type="button" aria-label="Cerrar selector de grabaciones" title="Cerrar">
+        <i data-icon="X"></i>
+      </button>
+    </div>
+    <div id="audio-version-list" class="audio-version-list" role="list"></div>
+  </dialog>
 
   <dialog id="word-dialog" class="word-dialog" aria-labelledby="word-dialog-title">
     <div class="word-dialog-header">
