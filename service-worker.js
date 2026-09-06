@@ -1,4 +1,4 @@
-const CACHE_NAME = "sj-bm-static-2026-08-19-7";
+const CACHE_NAME = "sj-bm-static-2026-09-06-audio-1";
 const OFFLINE_PAGE = "./index.html";
 const APP_SHELL = [
   "./",
@@ -7,7 +7,9 @@ const APP_SHELL = [
   "./icons.js",
   "./data.js",
   "./bhajans.js",
+  "./audio-map.js",
   "./app.js",
+  "./audio-player.js",
   "./manifest.webmanifest",
   "./sj-bm-icon.svg",
   "./sj-bm-icon-180.png",
