@@ -33,6 +33,8 @@
   let loadedKey = "";
   let loadedVersionUrl = "";
   let loading = false;
+  let wantsPlayback = false;
+  let playbackRequest = 0;
   let toastTimer;
   const preferences = readPreferences();
 
@@ -42,6 +44,15 @@
       navigator.audioSession.type = "playback";
     } catch {
       // Earlier iOS versions do not expose a configurable Audio Session API.
+    }
+  }
+
+  function setMediaPlaybackState(state) {
+    if (!("mediaSession" in navigator)) return;
+    try {
+      navigator.mediaSession.playbackState = state;
+    } catch {
+      // Playback state is only a hint and is unavailable in some older browsers.
     }
   }
 
@@ -149,6 +160,8 @@
   }
 
   function clearAudio() {
+    wantsPlayback = false;
+    playbackRequest += 1;
     audio.pause();
     audio.removeAttribute("src");
     audio.load();
@@ -157,7 +170,7 @@
     loading = false;
     if ("mediaSession" in navigator) {
       navigator.mediaSession.metadata = null;
-      if (!usesNativeIOSMediaControls) navigator.mediaSession.playbackState = "none";
+      setMediaPlaybackState("none");
     }
   }
 
@@ -198,24 +211,62 @@
     return true;
   }
 
-  async function playCurrent() {
+  function handlePlaybackFailure(requestId) {
+    if (requestId !== playbackRequest || !wantsPlayback) return;
+    wantsPlayback = false;
+    loading = false;
+    setMediaPlaybackState(audio.ended ? "none" : "paused");
+    installMediaSessionActions();
+    updateControls();
+    showToast("No se pudo reproducir esta grabación. Puedes elegir otra versión.");
+  }
+
+  function playLoadedAudio() {
+    configureIOSAudioSession();
+    if (audio.ended) audio.currentTime = 0;
+    wantsPlayback = true;
+    const requestId = ++playbackRequest;
+    loading = true;
+    setMediaPlaybackState("playing");
+    installMediaSessionActions();
+    updateControls();
+
+    let playPromise;
+    try {
+      playPromise = audio.play();
+    } catch {
+      handlePlaybackFailure(requestId);
+      return Promise.resolve();
+    }
+    return Promise.resolve(playPromise).catch(() => handlePlaybackFailure(requestId));
+  }
+
+  function playCurrent() {
     configureIOSAudioSession();
     const entry = currentEntry();
-    if (!entry) return;
+    if (!entry) return Promise.resolve();
     if (loadedKey !== keyFor(currentBhajan) || !loadedVersion(entry)) {
       const version = preferredVersion(entry) || versionsFor(entry)[0];
-      if (!prepareVersion(version)) return;
+      if (!prepareVersion(version)) return Promise.resolve();
     }
-    if (audio.ended) audio.currentTime = 0;
-    loading = true;
+    return playLoadedAudio();
+  }
+
+  function resumeFromMediaControls() {
+    if (!loadedKey || loadedKey !== keyFor(currentBhajan) || !loadedVersion(currentEntry())) return;
+    configureIOSAudioSession();
+    setMediaMetadata();
+    void playLoadedAudio();
+  }
+
+  function pauseCurrent() {
+    wantsPlayback = false;
+    playbackRequest += 1;
+    loading = false;
+    audio.pause();
+    setMediaPlaybackState(loadedKey ? "paused" : "none");
+    installMediaSessionActions();
     updateControls();
-    try {
-      await audio.play();
-    } catch {
-      loading = false;
-      updateControls();
-      showToast("No se pudo reproducir esta grabación. Puedes elegir otra versión.");
-    }
   }
 
   async function chooseVersion(version) {
@@ -257,7 +308,7 @@
     const entry = currentEntry();
     if (!entry) return;
     if (loadedKey === keyFor(currentBhajan) && !audio.paused) {
-      audio.pause();
+      pauseCurrent();
       return;
     }
     if (loadedVersion(entry) || preferredVersion(entry) || versionsFor(entry).length === 1) {
@@ -298,10 +349,10 @@
   }
 
   function installMediaSessionActions() {
-    if (usesNativeIOSMediaControls || !("mediaSession" in navigator)) return;
+    if (!("mediaSession" in navigator)) return;
     const actions = {
-      play: () => { void playCurrent(); },
-      pause: () => audio.pause(),
+      play: resumeFromMediaControls,
+      pause: pauseCurrent,
       seekbackward: (details) => seekBy(-(details.seekOffset || 10)),
       seekforward: (details) => seekBy(details.seekOffset || 10),
       seekto: seekTo,
@@ -315,8 +366,16 @@
     });
   }
 
-  document.addEventListener("visibilitychange", configureIOSAudioSession);
-  window.addEventListener("pageshow", configureIOSAudioSession);
+  function refreshMediaSession() {
+    configureIOSAudioSession();
+    installMediaSessionActions();
+    if (!loadedKey) return;
+    if (audio.ended) setMediaPlaybackState("none");
+    else setMediaPlaybackState(audio.paused ? "paused" : "playing");
+  }
+
+  document.addEventListener("visibilitychange", refreshMediaSession);
+  window.addEventListener("pageshow", refreshMediaSession);
   button.addEventListener("click", togglePlayback);
   optionsButton.addEventListener("click", openVersionDialog);
   closeDialog.addEventListener("click", () => dialog.close());
@@ -332,17 +391,25 @@
   window.addEventListener("bhajanchange", (event) => setCurrentBhajan(event.detail?.bhajan));
   audio.addEventListener("play", () => {
     configureIOSAudioSession();
+    wantsPlayback = true;
     loading = false;
-    if (!usesNativeIOSMediaControls && "mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
+    setMediaPlaybackState("playing");
+    installMediaSessionActions();
     updateControls();
   });
   audio.addEventListener("playing", () => {
+    wantsPlayback = true;
     loading = false;
+    setMediaPlaybackState("playing");
+    installMediaSessionActions();
     updateControls();
   });
   audio.addEventListener("pause", () => {
+    wantsPlayback = false;
+    playbackRequest += 1;
     loading = false;
-    if (!usesNativeIOSMediaControls && "mediaSession" in navigator && loadedKey) navigator.mediaSession.playbackState = "paused";
+    setMediaPlaybackState(loadedKey ? "paused" : "none");
+    installMediaSessionActions();
     updateControls();
   });
   audio.addEventListener("waiting", () => {
@@ -350,13 +417,20 @@
     updateControls();
   });
   audio.addEventListener("ended", () => {
+    wantsPlayback = false;
+    playbackRequest += 1;
     loading = false;
-    if (!usesNativeIOSMediaControls && "mediaSession" in navigator) navigator.mediaSession.playbackState = "none";
+    setMediaPlaybackState("none");
+    installMediaSessionActions();
     updateControls();
   });
   audio.addEventListener("error", () => {
     if (!loadedKey) return;
+    wantsPlayback = false;
+    playbackRequest += 1;
     loading = false;
+    setMediaPlaybackState("paused");
+    installMediaSessionActions();
     updateControls();
     showToast("Esta grabación no está disponible. Puedes elegir otra versión.");
   });
