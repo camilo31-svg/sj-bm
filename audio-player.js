@@ -26,6 +26,8 @@
   const usesNativeIOSMediaControls = /iPad|iPhone|iPod/.test(navigator.userAgent)
     || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   if (!data?.bhajans?.length || !catalog || !button || !optionsButton || !dialog || !audio) return;
+  audio.preload = "auto";
+  configureIOSAudioSession();
 
   let currentBhajan = bhajanFromLocation();
   let loadedKey = "";
@@ -33,6 +35,15 @@
   let loading = false;
   let toastTimer;
   const preferences = readPreferences();
+
+  function configureIOSAudioSession() {
+    if (!usesNativeIOSMediaControls || !("audioSession" in navigator)) return;
+    try {
+      navigator.audioSession.type = "playback";
+    } catch {
+      // Earlier iOS versions do not expose a configurable Audio Session API.
+    }
+  }
 
   function readPreferences() {
     try {
@@ -174,10 +185,12 @@
 
   function prepareVersion(version) {
     if (!version?.url) return false;
+    configureIOSAudioSession();
     if (loadedKey && (loadedKey !== keyFor(currentBhajan) || loadedVersionUrl !== version.url)) clearAudio();
     loadedKey = keyFor(currentBhajan);
     loadedVersionUrl = version.url;
     loading = true;
+    audio.preload = "auto";
     audio.src = version.url;
     audio.load();
     setMediaMetadata();
@@ -186,6 +199,7 @@
   }
 
   async function playCurrent() {
+    configureIOSAudioSession();
     const entry = currentEntry();
     if (!entry) return;
     if (loadedKey !== keyFor(currentBhajan) || !loadedVersion(entry)) {
@@ -301,6 +315,8 @@
     });
   }
 
+  document.addEventListener("visibilitychange", configureIOSAudioSession);
+  window.addEventListener("pageshow", configureIOSAudioSession);
   button.addEventListener("click", togglePlayback);
   optionsButton.addEventListener("click", openVersionDialog);
   closeDialog.addEventListener("click", () => dialog.close());
@@ -315,6 +331,7 @@
   });
   window.addEventListener("bhajanchange", (event) => setCurrentBhajan(event.detail?.bhajan));
   audio.addEventListener("play", () => {
+    configureIOSAudioSession();
     loading = false;
     if (!usesNativeIOSMediaControls && "mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
     updateControls();
